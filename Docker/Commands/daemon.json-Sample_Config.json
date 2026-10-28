@@ -1,5 +1,11 @@
 {
+    "data-root": "/opt/docker/docker-data",             // Change docker root directory
     "bip": "172.31.254.1/24",                           // Edit docker network range
     "registry-mirrors": ["https://repo.nima.local"],    // Set docker mirror registry
-    "insecure-registries" : [ "repo.nima.local" ]       // Set docker registry without ssl
+    "insecure-registries" : [ "repo.nima.local" ],      // Set docker registry without ssl
 }
+
+// For changing containers data store:
+// vim /etc/containerd/config.toml
+    // version = 2
+    // root = "/mnt/containerd-data"

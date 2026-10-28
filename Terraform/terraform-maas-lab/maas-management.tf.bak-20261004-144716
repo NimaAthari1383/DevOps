@@ -1,0 +1,68 @@
+resource "terraform_data" "maas_management_subnet" {
+  triggers_replace = [
+    var.maas_host,
+    var.maas_profile,
+    var.maas_management_subnet,
+    "gateway=none",
+    "dns=${var.maas_host}"
+  ]
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+
+    command = <<-EOT
+      set -euo pipefail
+
+      SUBNET_ID="$(
+        ssh \
+          -o ControlMaster=no \
+          -o ControlPath=none \
+          root@${var.maas_host} \
+          'maas ${var.maas_profile} subnets read' |
+        jq -r \
+          --arg cidr '${var.maas_management_subnet}' \
+          '.[] | select(.cidr == $cidr) | .id'
+      )"
+
+      if [[ -z "$SUBNET_ID" ]]; then
+        echo "ERROR: management subnet ${var.maas_management_subnet} not found in MAAS" >&2
+        exit 1
+      fi
+
+      echo "Managing MAAS subnet ID=$SUBNET_ID"
+
+      ssh \
+        -o ControlMaster=no \
+        -o ControlPath=none \
+        root@${var.maas_host} \
+        "maas ${var.maas_profile} subnet update $SUBNET_ID gateway_ip= dns_servers=${var.maas_host}" \
+        >/dev/null
+
+      RESULT="$(
+        ssh \
+          -o ControlMaster=no \
+          -o ControlPath=none \
+          root@${var.maas_host} \
+          "maas ${var.maas_profile} subnet read $SUBNET_ID"
+      )"
+
+      GATEWAY="$(jq -r '.gateway_ip // empty' <<<"$RESULT")"
+      DNS="$(jq -r '.dns_servers | join(",")' <<<"$RESULT")"
+
+      if [[ -n "$GATEWAY" ]]; then
+        echo "ERROR: management subnet unexpectedly has gateway=$GATEWAY" >&2
+        exit 1
+      fi
+
+      if [[ "$DNS" != "${var.maas_host}" ]]; then
+        echo "ERROR: unexpected management DNS: $DNS" >&2
+        exit 1
+      fi
+
+      echo "MAAS management subnet verified:"
+      echo "  CIDR    = ${var.maas_management_subnet}"
+      echo "  Gateway = NONE"
+      echo "  DNS     = ${var.maas_host}"
+    EOT
+  }
+}

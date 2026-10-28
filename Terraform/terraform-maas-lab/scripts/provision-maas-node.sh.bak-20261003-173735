@@ -1,0 +1,708 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 13 ]]; then
+    cat >&2 <<USAGE
+Usage:
+$0 VM_NAME MEMORY_MB CPUS DISK_GB VLAN_ID WORKLOAD_SUBNET WORKLOAD_IP \
+NAT_MAC WORKLOAD_MAC PXE_MAC MAAS_HOST MAAS_PROFILE MAAS_FABRIC_ID
+USAGE
+    exit 2
+fi
+
+VM_NAME="$1"
+MEMORY_MB="$2"
+CPUS="$3"
+DISK_GB="$4"
+VLAN_ID="$5"
+WORKLOAD_SUBNET="$6"
+WORKLOAD_IP="$7"
+NAT_MAC="$8"
+WORKLOAD_MAC="$9"
+PXE_MAC="${10}"
+MAAS_HOST="${11}"
+PROFILE="${12}"
+FABRIC_ID="${13}"
+
+MGMT_SUBNET="192.168.252.0/24"
+NAT_SUBNET="10.0.2.0/24"
+NAT_GATEWAY="10.0.2.2"
+IPXE_ISO="/usr/lib/ipxe/ipxe.iso"
+
+SSH=(
+  ssh
+  -o ControlMaster=no
+  -o ControlPath=none
+  -o ConnectTimeout=10
+  root@"$MAAS_HOST"
+)
+
+log() {
+    printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"
+}
+
+die() {
+    echo "ERROR: $*" >&2
+    exit 1
+}
+
+normalize_mac() {
+    local mac="$1"
+
+    mac="$(
+        echo "$mac" |
+        tr '[:upper:]' '[:lower:]' |
+        tr -d ':-'
+    )"
+
+    printf '%s:%s:%s:%s:%s:%s\n' \
+        "${mac:0:2}" \
+        "${mac:2:2}" \
+        "${mac:4:2}" \
+        "${mac:6:2}" \
+        "${mac:8:2}" \
+        "${mac:10:2}"
+}
+
+PXE_MAC_N="$(normalize_mac "$PXE_MAC")"
+NAT_MAC_N="$(normalize_mac "$NAT_MAC")"
+WORKLOAD_MAC_N="$(normalize_mac "$WORKLOAD_MAC")"
+
+vm_state() {
+    VBoxManage showvminfo "$VM_NAME" --machinereadable |
+        awk -F= '/^VMState=/{gsub(/"/,"",$2); print $2}'
+}
+
+start_vm_if_needed() {
+    local state
+    state="$(vm_state)"
+
+    if [[ "$state" == "poweroff" ]]; then
+        log "Starting $VM_NAME"
+        VBoxManage startvm "$VM_NAME" --type headless
+    fi
+}
+
+poweroff_vm() {
+    local state
+    state="$(vm_state)"
+
+    if [[ "$state" != "poweroff" ]]; then
+        log "Powering off $VM_NAME"
+        VBoxManage controlvm "$VM_NAME" poweroff >/dev/null 2>&1 || true
+
+        for _ in $(seq 1 30); do
+            [[ "$(vm_state)" == "poweroff" ]] && return 0
+            sleep 1
+        done
+
+        die "$VM_NAME did not power off"
+    fi
+}
+
+machine_json() {
+    "${SSH[@]}" "maas $PROFILE machine read $SYSTEM_ID"
+}
+
+machine_status() {
+    machine_json | jq -r '.status_name'
+}
+
+lookup_machine() {
+    "${SSH[@]}" "maas $PROFILE machines read" |
+    jq -r \
+        --arg pxe "$PXE_MAC_N" \
+        --arg nat "$NAT_MAC_N" \
+        --arg workload "$WORKLOAD_MAC_N" '
+          .[] |
+          select(
+            [.interface_set[].mac_address | ascii_downcase] as $macs |
+            ($macs | index($pxe)) != null or
+            ($macs | index($nat)) != null or
+            ($macs | index($workload)) != null
+          ) |
+          .system_id
+        ' |
+    head -1
+}
+
+lookup_iface_id() {
+    local mac="$1"
+
+    "${SSH[@]}" \
+        "maas $PROFILE interfaces read $SYSTEM_ID" |
+    jq -r --arg mac "$mac" '
+        .[] |
+        select((.mac_address | ascii_downcase) == $mac) |
+        .id
+    ' |
+    head -1
+}
+
+lookup_subnet_id() {
+    local cidr="$1"
+
+    "${SSH[@]}" "maas $PROFILE subnets read" |
+    jq -r --arg cidr "$cidr" '
+        .[] |
+        select(.cidr == $cidr) |
+        .id
+    ' |
+    head -1
+}
+
+lookup_vlan_id() {
+    "${SSH[@]}" \
+        "maas $PROFILE vlans read $FABRIC_ID" |
+    jq -r --argjson vid "$VLAN_ID" '
+        .[] |
+        select(.vid == $vid) |
+        .id
+    ' |
+    head -1
+}
+
+wait_status() {
+    local wanted="$1"
+    local timeout="${2:-1200}"
+    local elapsed=0
+
+    while (( elapsed < timeout )); do
+        local status
+        status="$(machine_status)"
+
+        printf '[MAAS] %-24s VM=%s\n' "$status" "$(vm_state)"
+
+        if [[ "$status" == "$wanted" ]]; then
+            return 0
+        fi
+
+        case "$status" in
+            "Failed commissioning"|"Failed testing")
+                die "MAAS entered $status"
+                ;;
+        esac
+
+        sleep 10
+        elapsed=$((elapsed + 10))
+    done
+
+    die "Timeout waiting for MAAS status: $wanted"
+}
+
+ensure_link() {
+    local iface_id="$1"
+    local cidr="$2"
+    local mode="$3"
+    local ip="${4:-}"
+
+    local subnet_id
+    subnet_id="$(lookup_subnet_id "$cidr")"
+
+    [[ -n "$subnet_id" ]] || die "Subnet not found: $cidr"
+
+    local existing
+    existing="$(
+        "${SSH[@]}" \
+            "maas $PROFILE interface read $SYSTEM_ID $iface_id" |
+        jq -r --arg cidr "$cidr" '
+            [.links[]? |
+             select(.subnet.cidr == $cidr)] |
+            length
+        '
+    )"
+
+    if (( existing > 0 )); then
+        log "Interface $iface_id already linked to $cidr"
+        return 0
+    fi
+
+    if [[ "$mode" == "STATIC" ]]; then
+        "${SSH[@]}" \
+            "maas $PROFILE interface link-subnet $SYSTEM_ID $iface_id mode=STATIC subnet=$subnet_id ip_address=$ip" \
+            >/dev/null
+    else
+        "${SSH[@]}" \
+            "maas $PROFILE interface link-subnet $SYSTEM_ID $iface_id mode=$mode subnet=$subnet_id" \
+            >/dev/null
+    fi
+}
+
+wait_enlist() {
+    log "Waiting for MAAS enlistment"
+
+    for attempt in $(seq 1 120); do
+        SYSTEM_ID="$(lookup_machine || true)"
+
+        if [[ -n "$SYSTEM_ID" ]]; then
+            log "Machine found: $SYSTEM_ID"
+            return 0
+        fi
+
+        echo "Waiting for enlist: $attempt/120"
+        sleep 5
+    done
+
+    die "Node did not enlist"
+}
+
+wait_installation() {
+    log "Waiting for curtin installation"
+
+    for attempt in $(seq 1 180); do
+        local status
+        local install
+        local state
+
+        status="$(machine_status)"
+
+        install="$(
+            "${SSH[@]}" \
+                "maas $PROFILE node-script-result read $SYSTEM_ID current-installation 2>/dev/null" |
+            jq -r '.status_name // "NotStarted"' \
+            2>/dev/null || true
+        )"
+
+        [[ -n "$install" ]] || install="NotStarted"
+
+        state="$(vm_state)"
+
+        echo "[$attempt/180] MAAS=$status INSTALL=$install VM=$state"
+
+        if [[ "$status" == "Failed deployment" ]]; then
+            die "Deployment failed"
+        fi
+
+        if [[ "$install" == "Passed" ]]; then
+            log "Curtin installation passed"
+            return 0
+        fi
+
+        sleep 10
+    done
+
+    die "Installation timeout"
+}
+
+wait_deployed() {
+    log "Waiting for MAAS Deployed"
+
+    for attempt in $(seq 1 90); do
+        local status
+        status="$(machine_status)"
+
+        echo "[$attempt/90] MAAS=$status VM=$(vm_state)"
+
+        if [[ "$status" == "Deployed" ]]; then
+            return 0
+        fi
+
+        [[ "$status" == "Failed deployment" ]] &&
+            die "MAAS reports Failed deployment"
+
+        sleep 10
+    done
+
+    die "Timeout waiting for Deployed"
+}
+
+verify_management_subnet() {
+    local subnet
+    local gateway
+    local dns
+
+    subnet="$(
+        "${SSH[@]}" "maas $PROFILE subnets read" |
+        jq -c --arg cidr "$MGMT_SUBNET" '
+            .[] |
+            select(.cidr == $cidr)
+        '
+    )"
+
+    [[ -n "$subnet" ]] ||
+        die "Management subnet not found: $MGMT_SUBNET"
+
+    gateway="$(jq -r '.gateway_ip // empty' <<<"$subnet")"
+
+    if [[ -n "$gateway" ]]; then
+        die "Management subnet must NOT have a gateway. Current gateway: $gateway"
+    fi
+
+    dns="$(
+        jq -r '
+            .dns_servers // [] |
+            join(",")
+        ' <<<"$subnet"
+    )"
+
+    if [[ "$dns" != "$MAAS_HOST" ]]; then
+        die "Management subnet DNS must be $MAAS_HOST. Current DNS: $dns"
+    fi
+
+    log "Management subnet verified"
+    echo "  CIDR    : $MGMT_SUBNET"
+    echo "  Gateway : NONE"
+    echo "  DNS     : $MAAS_HOST"
+}
+
+[[ -f "$IPXE_ISO" ]] ||
+    die "iPXE ISO missing: $IPXE_ISO"
+
+[[ -n "$WORKLOAD_IP" ]] ||
+    die "workload_ip is required"
+
+SYSTEM_ID="$(lookup_machine || true)"
+
+# ------------------------------------------------------------
+# Guard existing deployed machines.
+# ------------------------------------------------------------
+
+if [[ -n "$SYSTEM_ID" ]]; then
+    STATUS="$(machine_status)"
+
+    if [[ "$STATUS" == "Deployed" ]]; then
+        log "$VM_NAME is already Deployed in MAAS ($SYSTEM_ID)"
+
+        STATE="$(vm_state)"
+
+        if [[ "$STATE" == "poweroff" ]]; then
+            log "$VM_NAME is deployed but powered off; starting it."
+            VBoxManage startvm "$VM_NAME" --type headless
+        else
+            log "$VM_NAME runtime state: $STATE"
+        fi
+
+        log "Provisioning skipped for safety."
+        exit 0
+    fi
+fi
+
+# ------------------------------------------------------------
+# Prepare VirtualBox hardware.
+# ------------------------------------------------------------
+
+poweroff_vm
+
+"$(dirname "$0")/ensure-vm.sh" \
+    "$VM_NAME" \
+    "$MEMORY_MB" \
+    "$CPUS" \
+    "$DISK_GB" \
+    "$VLAN_ID" \
+    "$NAT_MAC" \
+    "$WORKLOAD_MAC" \
+    "$PXE_MAC"
+
+VBoxManage storageattach "$VM_NAME" \
+    --storagectl "IDE" \
+    --port 0 \
+    --device 0 \
+    --type dvddrive \
+    --medium "$IPXE_ISO"
+
+VBoxManage modifyvm "$VM_NAME" \
+    --boot1 dvd \
+    --boot2 disk \
+    --boot3 net \
+    --boot4 none \
+    --cableconnected1 on \
+    --cableconnected2 off \
+    --cableconnected3 on
+
+# ------------------------------------------------------------
+# Enlist.
+# ------------------------------------------------------------
+
+if [[ -z "$SYSTEM_ID" ]]; then
+    log "Starting PXE enlistment"
+    start_vm_if_needed
+    wait_enlist
+fi
+
+STATUS="$(machine_status)"
+
+log "System ID: $SYSTEM_ID"
+log "Current MAAS state: $STATUS"
+
+# ------------------------------------------------------------
+# Recover Failed deployment.
+# ------------------------------------------------------------
+
+if [[ "$STATUS" == "Failed deployment" ]]; then
+    log "Recovering failed deployment using MAAS testing"
+
+    "${SSH[@]}" \
+        "maas $PROFILE machine test $SYSTEM_ID" \
+        >/dev/null
+
+    start_vm_if_needed
+    wait_status "Ready" 1200
+
+    STATUS="Ready"
+fi
+
+# ------------------------------------------------------------
+# Commission.
+# ------------------------------------------------------------
+
+if [[ "$STATUS" == "New" ]]; then
+    log "Setting manual power type"
+
+    "${SSH[@]}" \
+        "maas $PROFILE machine update $SYSTEM_ID power_type=manual" \
+        >/dev/null
+
+    log "Starting commissioning"
+
+    "${SSH[@]}" \
+        "maas $PROFILE machine commission $SYSTEM_ID skip_bmc_config=1 testing_scripts=none" \
+        >/dev/null
+
+    start_vm_if_needed
+    wait_status "Ready" 1200
+
+elif [[ "$STATUS" == "Commissioning" ]]; then
+
+    start_vm_if_needed
+    wait_status "Ready" 1200
+
+elif [[ "$STATUS" == "Testing" ]]; then
+
+    start_vm_if_needed
+    wait_status "Ready" 1200
+
+elif [[ "$STATUS" != "Ready" ]]; then
+    die "Unsupported MAAS state before deployment: $STATUS"
+fi
+
+# ------------------------------------------------------------
+# Resolve MAAS interface IDs by exact MAC.
+# ------------------------------------------------------------
+
+PXE_IFACE="$(lookup_iface_id "$PXE_MAC_N")"
+NAT_IFACE="$(lookup_iface_id "$NAT_MAC_N")"
+WORKLOAD_IFACE="$(lookup_iface_id "$WORKLOAD_MAC_N")"
+
+[[ -n "$PXE_IFACE" ]] ||
+    die "PXE interface not found: $PXE_MAC_N"
+
+[[ -n "$NAT_IFACE" ]] ||
+    die "NAT interface not found: $NAT_MAC_N"
+
+[[ -n "$WORKLOAD_IFACE" ]] ||
+    die "Workload interface not found: $WORKLOAD_MAC_N"
+
+log "PXE interface      : $PXE_IFACE"
+log "NAT interface      : $NAT_IFACE"
+log "Workload interface : $WORKLOAD_IFACE"
+
+BOOT_IFACE="$(
+    machine_json |
+    jq -r '.boot_interface.id'
+)"
+
+[[ "$BOOT_IFACE" == "$PXE_IFACE" ]] ||
+    die "Wrong MAAS boot interface. Expected $PXE_IFACE, got $BOOT_IFACE"
+
+# ------------------------------------------------------------
+# Verify management subnet policy BEFORE deployment.
+# ------------------------------------------------------------
+
+verify_management_subnet
+
+# ------------------------------------------------------------
+# MAAS VLAN association.
+# ------------------------------------------------------------
+
+WORKLOAD_VLAN_ID="$(lookup_vlan_id)"
+
+[[ -n "$WORKLOAD_VLAN_ID" ]] ||
+    die "MAAS VLAN $VLAN_ID not found"
+
+log "MAAS internal workload VLAN: $WORKLOAD_VLAN_ID"
+
+"${SSH[@]}" \
+    "maas $PROFILE interface update $SYSTEM_ID $WORKLOAD_IFACE vlan=$WORKLOAD_VLAN_ID" \
+    >/dev/null
+
+# NAT        -> 5001
+# MAAS/PXE   -> 5003
+
+"${SSH[@]}" \
+    "maas $PROFILE interface update $SYSTEM_ID $NAT_IFACE vlan=5001" \
+    >/dev/null
+
+"${SSH[@]}" \
+    "maas $PROFILE interface update $SYSTEM_ID $PXE_IFACE vlan=5003" \
+    >/dev/null
+
+# ------------------------------------------------------------
+# MAAS interface links.
+# ------------------------------------------------------------
+
+ensure_link \
+    "$PXE_IFACE" \
+    "$MGMT_SUBNET" \
+    AUTO
+
+ensure_link \
+    "$WORKLOAD_IFACE" \
+    "$WORKLOAD_SUBNET" \
+    STATIC \
+    "$WORKLOAD_IP"
+
+ensure_link \
+    "$NAT_IFACE" \
+    "$NAT_SUBNET" \
+    DHCP
+
+# ------------------------------------------------------------
+# Default gateway = NAT only.
+# ------------------------------------------------------------
+
+NAT_LINK_ID="$(
+    "${SSH[@]}" \
+        "maas $PROFILE interface read $SYSTEM_ID $NAT_IFACE" |
+    jq -r '.links[0].id // empty'
+)"
+
+[[ -n "$NAT_LINK_ID" ]] ||
+    die "NAT link ID not found"
+
+"${SSH[@]}" \
+    "maas $PROFILE interface set-default-gateway $SYSTEM_ID $NAT_IFACE link_id=$NAT_LINK_ID" \
+    >/dev/null
+
+DEFAULT_GW="$(
+    machine_json |
+    jq -r '.default_gateways.ipv4.gateway_ip // empty'
+)"
+
+[[ "$DEFAULT_GW" == "$NAT_GATEWAY" ]] ||
+    die "Wrong default gateway: '$DEFAULT_GW', expected '$NAT_GATEWAY'"
+
+log "IPv4 default gateway verified: $DEFAULT_GW"
+
+# ------------------------------------------------------------
+# Deploy Ubuntu 26.04.
+# ------------------------------------------------------------
+
+log "Deploying Ubuntu Resolute"
+
+"${SSH[@]}" \
+    "maas $PROFILE machine deploy $SYSTEM_ID osystem=ubuntu distro_series=resolute hwe_kernel=ga-26.04" \
+    >/dev/null
+
+start_vm_if_needed
+
+wait_installation
+
+# ------------------------------------------------------------
+# Grace period after curtin.
+# ------------------------------------------------------------
+
+log "Installation passed; waiting briefly for MAAS/power transition"
+
+for _ in $(seq 1 30); do
+    STATUS="$(machine_status)"
+    STATE="$(vm_state)"
+
+    echo "MAAS=$STATUS VM=$STATE"
+
+    if [[ "$STATE" == "poweroff" ]]; then
+        break
+    fi
+
+    if [[ "$STATUS" == "Deployed" ]]; then
+        break
+    fi
+
+    sleep 5
+done
+
+# Hardware modifications require VM off.
+poweroff_vm
+
+# ------------------------------------------------------------
+# Final disk boot.
+# ------------------------------------------------------------
+
+log "Switching from iPXE to installed disk"
+
+VBoxManage storageattach "$VM_NAME" \
+    --storagectl "IDE" \
+    --port 0 \
+    --device 0 \
+    --type dvddrive \
+    --medium emptydrive
+
+VBoxManage modifyvm "$VM_NAME" \
+    --boot1 disk \
+    --boot2 none \
+    --boot3 none \
+    --boot4 none \
+    --cableconnected1 on \
+    --cableconnected2 on \
+    --cableconnected3 on
+
+start_vm_if_needed
+
+wait_deployed
+
+get_management_ip() {
+    local ip
+
+    ip="$(
+        "${SSH[@]}" \
+            "maas $PROFILE interface read $SYSTEM_ID $PXE_IFACE" |
+        jq -r --arg cidr "$MGMT_SUBNET" '
+            .links[]? |
+            select(.subnet.cidr == $cidr) |
+            .ip_address // empty
+        ' |
+        head -1
+    )"
+
+    [[ -n "$ip" ]] ||
+        die "Management IP not found for interface $PXE_IFACE"
+
+    printf '%s\n' "$ip"
+}
+
+wait_ssh() {
+    local ip="$1"
+
+    log "Waiting for SSH on $ip:22"
+
+    for attempt in $(seq 1 120); do
+        if nc -z -w2 "$ip" 22 >/dev/null 2>&1; then
+            log "SSH is ready on $ip:22"
+            return 0
+        fi
+
+        printf 'Waiting for SSH: %d/120\n' "$attempt"
+        sleep 5
+    done
+
+    die "SSH did not become ready on $ip:22"
+}
+
+# ------------------------------------------------------------
+# Final verification.
+# ------------------------------------------------------------
+
+log "Final MAAS state"
+
+machine_json |
+jq '{
+  system_id,
+  hostname,
+  status_name,
+  osystem,
+  distro_series,
+  hwe_kernel,
+  default_gateways,
+  ip_addresses
+}'
+
+log "$VM_NAME provisioning completed successfully."

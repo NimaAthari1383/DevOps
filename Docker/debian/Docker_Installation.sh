@@ -39,26 +39,24 @@ sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin doc
 [[ -d /etc/docker ]] || sudo mkdir /etc/docker 
 
 sudo cat << 'EOF' >> /etc/docker/daemon.json
-## Add registry mirrors
 { "registry-mirrors": ["https://hub.mecan.ir","https://hub.hamdocker.ir"] } 
 EOF
 
 
 ## Watch changes
 cat /etc/docker/daemon.json 
-{ "registry-mirrors": ["https://hub.mecan.ir","https://hub.hamdocker.ir"] } 
- 
+
 ## Restart docker service 
 sudo systemctl restart docker 
 sudo systemctl enable docker 
 sudo systemctl status docker 
- 
+
 
 ## To create the docker group and add your user: 
 
 ## Create the docker group:
 sudo groupadd docker 
- 
+
 
 ## Add your user to the docker group:
 sudo usermod -aG docker $USER 

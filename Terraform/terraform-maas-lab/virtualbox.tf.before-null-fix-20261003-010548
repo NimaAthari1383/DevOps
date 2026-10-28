@@ -1,0 +1,53 @@
+resource "terraform_data" "node_lifecycle" {
+  for_each = local.managed_nodes
+
+  triggers_replace = [
+    each.value.vm_name,
+    tostring(each.value.memory_mb),
+    tostring(each.value.cpus),
+    tostring(each.value.disk_gb),
+    tostring(each.value.vlan_id),
+
+    try(each.value.workload_ip, ""),
+
+    try(each.value.nat_mac, ""),
+    try(each.value.workload_mac, ""),
+    try(each.value.pxe_mac, ""),
+
+    var.maas_management_subnet,
+    var.maas_nat_subnet,
+    var.maas_nat_gateway,
+
+    filesha256("${path.module}/scripts/ensure-vm.sh"),
+    filesha256("${path.module}/scripts/provision-maas-node.sh")
+  ]
+
+  depends_on = [
+    terraform_data.maas_vlans
+  ]
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+
+    command = join(" ", [
+      "${path.module}/scripts/provision-maas-node.sh",
+
+      "\"${each.value.vm_name}\"",
+      tostring(each.value.memory_mb),
+      tostring(each.value.cpus),
+      tostring(each.value.disk_gb),
+      tostring(each.value.vlan_id),
+
+      "\"${var.vlans[tostring(each.value.vlan_id)].subnet}\"",
+      "\"${each.value.workload_ip}\"",
+
+      "\"${each.value.nat_mac}\"",
+      "\"${each.value.workload_mac}\"",
+      "\"${each.value.pxe_mac}\"",
+
+      "\"${var.maas_host}\"",
+      "\"${var.maas_profile}\"",
+      tostring(var.maas_fabric_id)
+    ])
+  }
+}

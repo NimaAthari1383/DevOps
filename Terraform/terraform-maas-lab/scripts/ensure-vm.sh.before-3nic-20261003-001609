@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 5 ]]; then
+    echo "Usage: $0 <VM_NAME> <MEMORY_MB> <CPUS> <DISK_GB> <VLAN_ID>" >&2
+    exit 2
+fi
+
+VM_NAME="$1"
+MEMORY_MB="$2"
+CPUS="$3"
+DISK_GB="$4"
+VLAN_ID="$5"
+
+PXE_NET="vboxnet1"
+WORKLOAD_BRIDGE="br-vlan${VLAN_ID}"
+
+echo "========================================"
+echo "Ensuring VirtualBox VM: $VM_NAME"
+echo "Memory      : ${MEMORY_MB} MB"
+echo "CPU         : ${CPUS}"
+echo "Disk        : ${DISK_GB} GB"
+echo "PXE network : ${PXE_NET}"
+echo "Workload    : ${WORKLOAD_BRIDGE}"
+echo "========================================"
+
+if ! VBoxManage showvminfo "$VM_NAME" >/dev/null 2>&1; then
+    echo "ERROR: VM $VM_NAME does not exist." >&2
+    echo "Automatic VM creation will be added in the next step." >&2
+    exit 1
+fi
+
+STATE="$(
+    VBoxManage showvminfo "$VM_NAME" --machinereadable |
+    awk -F= '/^VMState=/{gsub(/"/,"",$2); print $2}'
+)"
+
+echo "Current VM state: $STATE"
+
+if [[ "$STATE" != "poweroff" ]]; then
+    echo "ERROR: VM $VM_NAME must be powered off before hardware changes." >&2
+    exit 1
+fi
+
+if ! ip link show "$WORKLOAD_BRIDGE" >/dev/null 2>&1; then
+    echo "ERROR: $WORKLOAD_BRIDGE does not exist." >&2
+    exit 1
+fi
+
+echo "Configuring CPU and memory..."
+
+VBoxManage modifyvm "$VM_NAME" \
+    --memory "$MEMORY_MB" \
+    --cpus "$CPUS"
+
+echo "Configuring NIC1 for PXE/management..."
+
+VBoxManage modifyvm "$VM_NAME" \
+    --nic1 hostonly \
+    --host-only-adapter1 "$PXE_NET" \
+    --nictype1 82540EM \
+    --cable-connected1 on
+
+echo "Configuring NIC2 for workload VLAN ${VLAN_ID}..."
+
+VBoxManage modifyvm "$VM_NAME" \
+    --nic2 bridged \
+    --bridgeadapter2 "$WORKLOAD_BRIDGE" \
+    --nictype2 82540EM \
+    --cable-connected2 on
+
+
+echo
+echo "VM $VM_NAME configuration is ready."

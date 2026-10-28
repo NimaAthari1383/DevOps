@@ -1,0 +1,871 @@
+{
+  "version": 4,
+  "terraform_version": "1.16.4",
+  "serial": 69,
+  "lineage": "941b9528-329d-7b32-e180-a74d3071b961",
+  "outputs": {},
+  "resources": [
+    {
+      "mode": "managed",
+      "type": "terraform_data",
+      "name": "maas_netplan",
+      "provider": "provider[\"terraform.io/builtin/terraform\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "id": "e75f4b3f-a569-4b8c-4bc5-5454ea237125",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "{\"721\":{\"description\":\"Software\",\"dhcp_end\":\"172.19.1.254\",\"dhcp_start\":\"172.19.1.191\",\"gateway\":\"172.19.1.1\",\"rack_ip\":\"172.19.1.10\",\"subnet\":\"172.19.1.0/24\"},\"761\":{\"description\":\"Information Technology\",\"dhcp_end\":\"172.16.1.254\",\"dhcp_start\":\"172.16.1.250\",\"gateway\":\"172.16.1.1\",\"rack_ip\":\"172.16.1.10\",\"subnet\":\"172.16.1.0/24\"},\"781\":{\"description\":\"DevOps\",\"dhcp_end\":\"172.18.1.254\",\"dhcp_start\":\"172.18.1.250\",\"gateway\":\"172.18.1.1\",\"rack_ip\":\"172.18.1.10\",\"subnet\":\"172.18.1.0/24\"},\"850\":{\"description\":\"Terraform-Test\",\"dhcp_end\":\"172.30.50.254\",\"dhcp_start\":\"172.30.50.191\",\"gateway\":\"172.30.50.1\",\"rack_ip\":\"172.30.50.10\",\"subnet\":\"172.30.50.0/24\"},\"851\":{\"description\":\"Terraform-Test-2\",\"dhcp_end\":\"172.30.51.254\",\"dhcp_start\":\"172.30.51.191\",\"gateway\":\"172.30.51.1\",\"rack_ip\":\"172.30.51.10\",\"subnet\":\"172.30.51.0/24\"},\"852\":{\"description\":\"Terraform-Test-3\",\"dhcp_end\":\"172.30.52.254\",\"dhcp_start\":\"172.30.52.191\",\"gateway\":\"172.30.52.1\",\"rack_ip\":\"172.30.52.10\",\"subnet\":\"172.30.52.0/24\"}}"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_vlan_base",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "terraform_data",
+      "name": "maas_vlan_base",
+      "provider": "provider[\"terraform.io/builtin/terraform\"]",
+      "instances": [
+        {
+          "index_key": "721",
+          "schema_version": 0,
+          "attributes": {
+            "id": "adda5f54-7bd1-33dd-8ee2-d1fac5ee2335",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "721",
+                "172.19.1.0/24",
+                "172.19.1.1"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "761",
+          "schema_version": 0,
+          "attributes": {
+            "id": "7c2197dd-d030-bab9-1fea-9dd42907463a",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "761",
+                "172.16.1.0/24",
+                "172.16.1.1"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "781",
+          "schema_version": 0,
+          "attributes": {
+            "id": "76b76d5f-97f5-14ef-4375-3eef6d61c9b5",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "781",
+                "172.18.1.0/24",
+                "172.18.1.1"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "850",
+          "schema_version": 0,
+          "attributes": {
+            "id": "a370008b-5bc1-fa14-b38c-1a5ae243a158",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "850",
+                "172.30.50.0/24",
+                "172.30.50.1"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "851",
+          "schema_version": 0,
+          "attributes": {
+            "id": "36231070-bd51-5293-c774-46e622dadccc",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "851",
+                "172.30.51.0/24",
+                "172.30.51.1"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "852",
+          "schema_version": 0,
+          "attributes": {
+            "id": "355173fd-9bd1-5d16-8e2e-e4b6b95c859c",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "852",
+                "172.30.52.0/24",
+                "172.30.52.1"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "terraform_data",
+      "name": "maas_vlans",
+      "provider": "provider[\"terraform.io/builtin/terraform\"]",
+      "instances": [
+        {
+          "index_key": "721",
+          "schema_version": 0,
+          "attributes": {
+            "id": "05cba9c7-739a-6ebc-fbe7-199721231234",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "721",
+                "172.19.1.0/24",
+                "172.19.1.1",
+                "172.19.1.10",
+                "172.19.1.191",
+                "172.19.1.254"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_netplan",
+            "terraform_data.maas_vlan_base",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "761",
+          "schema_version": 0,
+          "attributes": {
+            "id": "d0fc36d4-af86-bceb-0602-ff08b60996e5",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "761",
+                "172.16.1.0/24",
+                "172.16.1.1",
+                "172.16.1.10",
+                "172.16.1.250",
+                "172.16.1.254"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_netplan",
+            "terraform_data.maas_vlan_base",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "781",
+          "schema_version": 0,
+          "attributes": {
+            "id": "681bfb66-5503-81d9-de41-f3c9b7840653",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "781",
+                "172.18.1.0/24",
+                "172.18.1.1",
+                "172.18.1.10",
+                "172.18.1.250",
+                "172.18.1.254"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_netplan",
+            "terraform_data.maas_vlan_base",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "850",
+          "schema_version": 0,
+          "attributes": {
+            "id": "a7c7875f-8625-014e-0ab6-88c6d0f08e05",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "850",
+                "172.30.50.0/24",
+                "172.30.50.1",
+                "172.30.50.10",
+                "172.30.50.191",
+                "172.30.50.254"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_netplan",
+            "terraform_data.maas_vlan_base",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "851",
+          "schema_version": 0,
+          "attributes": {
+            "id": "25bb5b97-e9a6-40f8-82f7-3dc080b98762",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "851",
+                "172.30.51.0/24",
+                "172.30.51.1",
+                "172.30.51.10",
+                "172.30.51.191",
+                "172.30.51.254"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_netplan",
+            "terraform_data.maas_vlan_base",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "852",
+          "schema_version": 0,
+          "attributes": {
+            "id": "05be928c-98db-2ff0-1036-fad9f7b0106c",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "852",
+                "172.30.52.0/24",
+                "172.30.52.1",
+                "172.30.52.10",
+                "172.30.52.191",
+                "172.30.52.254"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_netplan",
+            "terraform_data.maas_vlan_base",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "terraform_data",
+      "name": "node_vm_config",
+      "provider": "provider[\"terraform.io/builtin/terraform\"]",
+      "instances": [
+        {
+          "index_key": "node01",
+          "schema_version": 0,
+          "attributes": {
+            "id": "d6719143-14c0-3a34-0da8-d40255ce4b4a",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "Node01",
+                "2048",
+                "1",
+                "20",
+                "781"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_netplan",
+            "terraform_data.maas_vlan_base",
+            "terraform_data.maas_vlans",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "node02",
+          "schema_version": 0,
+          "attributes": {
+            "id": "221a055e-f89a-28cf-dc91-d7971adb2996",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "Node02",
+                "4096",
+                "1",
+                "20",
+                "761"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_netplan",
+            "terraform_data.maas_vlan_base",
+            "terraform_data.maas_vlans",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        },
+        {
+          "index_key": "node03",
+          "schema_version": 0,
+          "attributes": {
+            "id": "7c32f79c-b730-75ed-847c-7e3aaf9e361c",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": {
+              "value": [
+                "Node03",
+                "4096",
+                "1",
+                "20",
+                "721"
+              ],
+              "type": [
+                "tuple",
+                [
+                  "string",
+                  "string",
+                  "string",
+                  "string",
+                  "string"
+                ]
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.maas_netplan",
+            "terraform_data.maas_vlan_base",
+            "terraform_data.maas_vlans",
+            "terraform_data.ovs_trunk",
+            "terraform_data.vlans"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "terraform_data",
+      "name": "ovs_trunk",
+      "provider": "provider[\"terraform.io/builtin/terraform\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "id": "b3cb707f-3b98-1804-d53a-3ba5f968528f",
+            "input": null,
+            "output": null,
+            "store": null,
+            "triggers_replace": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "terraform_data",
+      "name": "vlans",
+      "provider": "provider[\"terraform.io/builtin/terraform\"]",
+      "instances": [
+        {
+          "index_key": "721",
+          "schema_version": 0,
+          "attributes": {
+            "id": "c45d5359-f84e-1ef7-de6c-56d271a80d8e",
+            "input": {
+              "value": {
+                "description": "Software",
+                "vlan_id": 721
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "output": {
+              "value": {
+                "description": "Software",
+                "vlan_id": 721
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "store": null,
+            "triggers_replace": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk"
+          ]
+        },
+        {
+          "index_key": "761",
+          "schema_version": 0,
+          "attributes": {
+            "id": "acf36139-5a21-0944-cdcb-dad99d58c70d",
+            "input": {
+              "value": {
+                "description": "Information Technology",
+                "vlan_id": 761
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "output": {
+              "value": {
+                "description": "Information Technology",
+                "vlan_id": 761
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "store": null,
+            "triggers_replace": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk"
+          ]
+        },
+        {
+          "index_key": "781",
+          "schema_version": 0,
+          "attributes": {
+            "id": "48a55640-384f-559e-426c-80539c103144",
+            "input": {
+              "value": {
+                "description": "DevOps",
+                "vlan_id": 781
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "output": {
+              "value": {
+                "description": "DevOps",
+                "vlan_id": 781
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "store": null,
+            "triggers_replace": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk"
+          ]
+        },
+        {
+          "index_key": "850",
+          "schema_version": 0,
+          "attributes": {
+            "id": "8b7c2cb8-10d4-1e23-ceef-996cd6290dd7",
+            "input": {
+              "value": {
+                "description": "Terraform-Test",
+                "vlan_id": 850
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "output": {
+              "value": {
+                "description": "Terraform-Test",
+                "vlan_id": 850
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "store": null,
+            "triggers_replace": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk"
+          ]
+        },
+        {
+          "index_key": "851",
+          "schema_version": 0,
+          "attributes": {
+            "id": "4c06907d-4236-dd58-d141-5248361f6f8f",
+            "input": {
+              "value": {
+                "description": "Terraform-Test-2",
+                "vlan_id": 851
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "output": {
+              "value": {
+                "description": "Terraform-Test-2",
+                "vlan_id": 851
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "store": null,
+            "triggers_replace": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk"
+          ]
+        },
+        {
+          "index_key": "852",
+          "schema_version": 0,
+          "attributes": {
+            "id": "0d2cb3f8-009a-5c79-348b-5b81849b6e70",
+            "input": {
+              "value": {
+                "description": "Terraform-Test-3",
+                "vlan_id": 852
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "output": {
+              "value": {
+                "description": "Terraform-Test-3",
+                "vlan_id": 852
+              },
+              "type": [
+                "object",
+                {
+                  "description": "string",
+                  "vlan_id": "number"
+                }
+              ]
+            },
+            "store": null,
+            "triggers_replace": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "dependencies": [
+            "terraform_data.ovs_trunk"
+          ]
+        }
+      ]
+    }
+  ],
+  "check_results": null
+}

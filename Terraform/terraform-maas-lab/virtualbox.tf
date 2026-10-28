@@ -1,0 +1,81 @@
+resource "terraform_data" "node_vm" {
+  for_each = local.managed_nodes
+
+  # Raw VM creation only.
+  triggers_replace = [
+    each.value.vm_name,
+    tostring(each.value.memory_mb),
+    tostring(each.value.cpus),
+    tostring(each.value.disk_gb),
+
+    filesha256("${path.module}/scripts/create-vm.sh"),
+  ]
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+
+    command = join(" ", [
+      "${path.module}/scripts/create-vm.sh",
+      "\"${each.value.vm_name}\"",
+      tostring(each.value.memory_mb),
+      tostring(each.value.cpus),
+      tostring(each.value.disk_gb),
+      "\"${var.virtualbox_vm_base_dir}\""
+    ])
+  }
+}
+
+
+resource "terraform_data" "node_lifecycle" {
+  for_each = local.managed_nodes
+
+  triggers_replace = [
+    each.value.vm_name,
+    tostring(each.value.memory_mb),
+    tostring(each.value.cpus),
+    tostring(each.value.disk_gb),
+    tostring(each.value.vlan_id),
+
+    coalesce(each.value.workload_ip, ""),
+    coalesce(each.value.workload_mac, ""),
+    coalesce(each.value.pxe_mac, ""),
+
+    var.maas_management_subnet,
+    var.maas_management_gateway,
+
+    filesha256("${path.module}/scripts/ensure-vm.sh"),
+    filesha256("${path.module}/scripts/provision-maas-node.sh"),
+    filesha256("${path.module}/scripts/trigger-awx.sh"),
+  ]
+
+  depends_on = [
+    terraform_data.maas_vlans,
+    terraform_data.maas_management_subnet,
+    terraform_data.node_vm,
+  ]
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+
+    command = join(" ", [
+      "${path.module}/scripts/provision-maas-node.sh",
+
+      "\"${each.value.vm_name}\"",
+      tostring(each.value.memory_mb),
+      tostring(each.value.cpus),
+      tostring(each.value.disk_gb),
+      tostring(each.value.vlan_id),
+
+      "\"${var.vlans[tostring(each.value.vlan_id)].subnet}\"",
+      "\"${coalesce(each.value.workload_ip, "")}\"",
+
+      "\"${coalesce(each.value.workload_mac, "")}\"",
+      "\"${coalesce(each.value.pxe_mac, "")}\"",
+
+      "\"${var.maas_host}\"",
+      "\"${var.maas_profile}\"",
+      tostring(var.maas_fabric_id),
+      "\"${var.maas_management_gateway}\""
+    ])
+  }
+}

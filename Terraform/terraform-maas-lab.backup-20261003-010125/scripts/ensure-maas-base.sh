@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 3 ]]; then
+    echo "Usage: $0 <VID> <CIDR> <GATEWAY>" >&2
+    exit 2
+fi
+
+VID="$1"
+CIDR="$2"
+GATEWAY="$3"
+
+MAAS_HOST="192.168.252.10"
+PROFILE="Athari.Nima"
+FABRIC_ID="2"
+
+ssh \
+  -o ControlMaster=no \
+  -o ControlPath=none \
+  root@"$MAAS_HOST" bash -s -- \
+    "$VID" \
+    "$CIDR" \
+    "$GATEWAY" \
+    "$PROFILE" \
+    "$FABRIC_ID" <<'REMOTE'
+
+set -euo pipefail
+
+VID="$1"
+CIDR="$2"
+GATEWAY="$3"
+PROFILE="$4"
+FABRIC_ID="$5"
+
+echo "========================================"
+echo "Preparing MAAS VLAN $VID"
+echo "CIDR    : $CIDR"
+echo "Gateway : $GATEWAY"
+echo "========================================"
+
+VLAN_INTERNAL_ID="$(
+    maas "$PROFILE" vlans read "$FABRIC_ID" |
+    jq -r --argjson vid "$VID" '
+        .[] |
+        select(.vid == $vid) |
+        .id
+    ' |
+    head -1
+)"
+
+if [[ -z "$VLAN_INTERNAL_ID" ]]; then
+    echo "Creating MAAS VLAN $VID..."
+
+    VLAN_INTERNAL_ID="$(
+        maas "$PROFILE" vlans create "$FABRIC_ID" \
+            vid="$VID" \
+            name="VLAN-${VID}" |
+        jq -r '.id'
+    )"
+else
+    echo "MAAS VLAN $VID already exists: ID=$VLAN_INTERNAL_ID"
+fi
+
+SUBNET_ID="$(
+    maas "$PROFILE" subnets read |
+    jq -r --arg cidr "$CIDR" '
+        .[] |
+        select(.cidr == $cidr) |
+        .id
+    ' |
+    head -1
+)"
+
+if [[ -z "$SUBNET_ID" ]]; then
+    echo "Creating subnet $CIDR..."
+
+    SUBNET_ID="$(
+        maas "$PROFILE" subnets create \
+            cidr="$CIDR" \
+            vlan="$VLAN_INTERNAL_ID" \
+            gateway_ip="$GATEWAY" |
+        jq -r '.id'
+    )"
+
+    echo "Subnet created: ID=$SUBNET_ID"
+else
+    echo "Subnet $CIDR already exists: ID=$SUBNET_ID"
+fi
+
+echo
+echo "MAAS base for VLAN $VID is ready."
+
+REMOTE
